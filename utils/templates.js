@@ -1,6 +1,38 @@
 
 export const STORE_TEMPLATES = [
   {
+    id: "marketplace",
+    name: "Marketplace",
+    description: "Black + amber on soft grey. White header with categories menu, banner with floating search, bordered product cards.",
+    theme: {
+      primary_color: "#141414",
+      primary_dark: "#000000",
+      primary_soft: "#ecece8",
+      accent_color: "#ffb400",
+      background_color: "#f5f5f3",
+      text_color: "#141414",
+      font_display: "Poppins",
+      font_body: "Inter",
+      layout_style: "marketplace",
+    },
+  },
+  {
+    id: "mindleaf",
+    name: "Mindleaf",
+    description: "Sage mist + deep leaf green + soft apricot. Rounded photo cards, pill buttons, calm and professional.",
+    theme: {
+      primary_color: "#2f5d4a",
+      primary_dark: "#1e4132",
+      primary_soft: "#e1ebdd",
+      accent_color: "#e9a66b",
+      background_color: "#f4f7f1",
+      text_color: "#17251d",
+      font_display: "Plus Jakarta Sans",
+      font_body: "Inter",
+      layout_style: "mindleaf",
+    },
+  },
+  {
     id: "classic",
     name: "Classic Emerald",
     description: "Deep emerald + warm brass. Soft corners, bordered cards, quiet and editorial.",
@@ -166,4 +198,4 @@ export function getTemplateById(id) {
   return STORE_TEMPLATES.find((t) => t.id === id) || STORE_TEMPLATES[0];
 }
 
-export const DEFAULT_TEMPLATE_ID = "classic";
+export const DEFAULT_TEMPLATE_ID = "marketplace";

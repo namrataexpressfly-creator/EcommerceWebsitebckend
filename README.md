@@ -69,6 +69,38 @@ online payment. If `RAZORPAY_KEY_ID` / `RAZORPAY_KEY_SECRET` aren't set:
   `razorpay.payments.refund(...)` call is noted but commented out (needs a real
   payment_id + your Razorpay Route/Refunds setup)
 
+## Developer login & shipping plugins
+
+Developers are a separate role from admins and sellers. They can sign in at `/developer/login` and manage the
+shipping (courier) plugins that sellers install from **Seller > Plugins** — and nothing else.
+
+```bash
+npm run create:developer -- <username> <password>   # creates a developer (or resets the password)
+```
+
+- `POST /api/developer/login`, `GET /api/developer/me`
+- `GET/POST/PUT/DELETE /api/developer/plugins` (admins can use the same API at `/api/admin/plugins`)
+- **Admin approval:** a developer's plugin starts as `draft`. They click **Submit for review** (`pending`), and an admin
+  **Approves** or **Rejects** it (a reason is required) at `/admin/plugins`. Sellers only see plugins that are
+  `status: active` **and** `review_status: approved`. Plugins created by an admin are approved immediately.
+- If a developer changes the API domains, APIs, seller fields, adapter key or docs link of a submitted/approved plugin,
+  it goes back to `draft` and needs approval again (this protects sellers' API keys).
+- Plugins that existed before this feature are marked `approved` automatically on the next server start.
+- To lock a developer out, set `is_active: false` on their `developers` document — it takes effect immediately.
+
+## Standard courier plugins
+
+A courier partner implements one fixed API (the **Expressfly Courier API**): `/login`, `/create-warehouse`, `/get-rates`,
+`/ship-orders`, `/set-webhook-url`, plus a tracking webhook that the courier calls. A developer then creates the plugin
+(**Integration type: Standard**) by entering only the courier's main domain. Paths, headers, request bodies and responses are
+preloaded from `services/standardPlugin.js`, which is also the source of the partner documentation.
+
+- Tracking webhook payload: `{ awb, last_tracking_status, tracking_logs: [{ scan, scan_date_time, remark, location, _id, ... }], event_type: "TRACKING_UPDATED" }`. Status labels: Created, Picked Up, In Transit, Out For Delivery, Delivered, Undelivered, RTO Initiated, RTO Delivered, Cancelled.
+- Developer screen: **Courier API documentation** > *Copy as Markdown* / *Download .md* (also `docs: EXPRESSFLY_COURIER_API.md`).
+- Sellers enter **Username** and **Password**. *Save & test connection* logs in and calls `/set-webhook-url` with the seller's tracking URL.
+- A pickup warehouse is sent to the courier (`/create-warehouse`) the first time it is used, and again if it is edited.
+- Existing plugins keep working: their integration type is **Custom** (the hand-written JSON editor).
+
 ## Setup
 
 ```bash

@@ -24,6 +24,14 @@ export function signAdminToken(admin) {
   );
 }
 
+export function signDeveloperToken(developer) {
+  return jwt.sign(
+    { type: "developer", id: developer._id.toString(), username: developer.username },
+    process.env.JWT_SECRET,
+    { expiresIn: "12h" }
+  );
+}
+
 export function verifyToken(token) {
   return jwt.verify(token, process.env.JWT_SECRET);
 }

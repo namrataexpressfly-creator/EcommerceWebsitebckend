@@ -1,6 +1,7 @@
 import { StatusCodes } from "http-status-codes";
 import { verifyToken } from "../utils/token.js";
 import Seller from "../models/Seller.js";
+import Developer from "../models/Developer.js";
 
 export async function requireSellerAuth(req, res, next) {
   const header = req.headers.authorization || "";
@@ -18,8 +19,7 @@ export async function requireSellerAuth(req, res, next) {
   }
 
   try {
-    // Checked on every request so a suspension takes effect immediately,
-    // even for sellers who are already logged in.
+
     const seller = await Seller.findById(payload.id).select("is_active");
     if (!seller) {
       return res.status(StatusCodes.UNAUTHORIZED).json({ error: "We couldn't find your account. Please log in again." });
@@ -100,4 +100,68 @@ export function requireAdminAuth(req, res, next) {
   } catch (err) {
     return res.status(StatusCodes.UNAUTHORIZED).json({ error: "Your session has expired. Please log in again." });
   }
+}
+
+
+export async function requireDeveloperAuth(req, res, next) {
+  const header = req.headers.authorization || "";
+  const token = header.startsWith("Bearer ") ? header.slice(7) : null;
+
+  if (!token) {
+    return res.status(StatusCodes.UNAUTHORIZED).json({ error: "Please log in to continue." });
+  }
+
+  let payload;
+  try {
+    payload = verifyToken(token);
+  } catch (err) {
+    return res.status(StatusCodes.UNAUTHORIZED).json({ error: "Your session has expired. Please log in again." });
+  }
+  if (payload.type !== "developer") {
+    return res.status(StatusCodes.UNAUTHORIZED).json({ error: "Please log in to continue." });
+  }
+
+  try {
+    const developer = await Developer.findById(payload.id).select("is_active");
+    if (!developer) {
+      return res.status(StatusCodes.UNAUTHORIZED).json({ error: "We couldn't find your account. Please log in again." });
+    }
+    if (developer.is_active === false) {
+      return res.status(StatusCodes.FORBIDDEN).json({ error: "Your developer account has been disabled. Please contact the admin." });
+    }
+    req.developer = payload;
+    next();
+  } catch (err) {
+    return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ error: "Something went wrong on our side. Please try again." });
+  }
+}
+
+
+export async function requirePluginManagerAuth(req, res, next) {
+  const header = req.headers.authorization || "";
+  const token = header.startsWith("Bearer ") ? header.slice(7) : null;
+
+  if (!token) {
+    return res.status(StatusCodes.UNAUTHORIZED).json({ error: "Please log in to continue." });
+  }
+
+  let payload;
+  try {
+    payload = verifyToken(token);
+  } catch (err) {
+    return res.status(StatusCodes.UNAUTHORIZED).json({ error: "Your session has expired. Please log in again." });
+  }
+
+  if (payload.type === "admin") {
+    req.admin = payload;
+    req.staff = { type: "admin", id: payload.id };
+    return next();
+  }
+  if (payload.type === "developer") {
+    return requireDeveloperAuth(req, res, () => {
+      req.staff = { type: "developer", id: payload.id };
+      next();
+    });
+  }
+  return res.status(StatusCodes.UNAUTHORIZED).json({ error: "Please log in to continue." });
 }

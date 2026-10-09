@@ -6,6 +6,7 @@ import { fileURLToPath } from "url";
 import rateLimit from "express-rate-limit";
 
 import { connectDB } from "./db.js";
+import { backfillPluginReview } from "./services/pluginReview.js";
 import { toFriendlyError } from "./utils/validation.js";
 
 import authRoutes from "./routes/authRoutes.js";
@@ -40,7 +41,12 @@ import adminAuthRoutes from "./routes/adminAuthRoutes.js";
 import adminKycRoutes from "./routes/adminKycRoutes.js";
 import adminSellersRoutes from "./routes/adminSellersRoutes.js";
 import adminCustomersRoutes from "./routes/adminCustomersRoutes.js";
-
+import domainRoutes from "./routes/domainRoutes.js";
+import pluginRoutes from "./routes/pluginRoutes.js";
+import shippingRoutes from "./routes/shippingRoutes.js";
+import pluginWebhookRoutes from "./routes/pluginWebhookRoutes.js";
+import adminPluginRoutes from "./routes/adminPluginRoutes.js";
+import developerAuthRoutes from "./routes/developerAuthRoutes.js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -79,6 +85,9 @@ app.use(
   })
 );
 
+// Courier tracking webhooks. Must come before "/api/webhook" so Razorpay's raw-body handler doesn't swallow it.
+app.use("/api/webhook/plugin", express.text({ type: "*/*", limit: "1mb" }), pluginWebhookRoutes);
+
 app.use(
   "/api/webhook",
   express.raw({
@@ -94,7 +103,7 @@ app.use(
     extended: true,
   })
 );
-
+  app.use("/api", domainRoutes);
 app.use(
   express.static(
     path.join(__dirname, "public")
@@ -124,6 +133,8 @@ app.use(
   "/api/checkout",
   limiter
 );
+
+app.use("/api/developer/login", limiter);
 
 
 app.use(
@@ -282,6 +293,18 @@ app.use(
   adminCustomersRoutes
 );
 
+// Shipping plugins
+// Sellers: browse / install / configure couriers, then ship orders with them.
+app.use("/api/seller/plugins", pluginRoutes);
+app.use("/api/seller/shipping", shippingRoutes);
+
+// Plugin definitions are managed by admins and by developers (same router, two entry points).
+app.use("/api/admin/plugins", adminPluginRoutes);
+app.use("/api/developer/plugins", adminPluginRoutes);
+
+// Developer login
+app.use("/api/developer", developerAuthRoutes);
+
 app.get(
   "/api/health",
   (req, res) => {
@@ -331,7 +354,8 @@ const PORT =
   process.env.PORT || 4000;
 
 connectDB()
-  .then(() => {
+  .then(async () => {
+    await backfillPluginReview().catch((e) => console.error("Plugin review backfill failed:", e.message));
     console.log(
       "MongoDB connected successfully"
     );

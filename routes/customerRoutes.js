@@ -40,6 +40,11 @@ function assertSameStore(req, seller) {
   }
 }
 
+// Stable key for a cart line (product + variant). Handles plain id strings,
+// ObjectIds, and populated product objects so lookups always match.
+const cartKeyOf = (productId, combinationId) =>
+  `${String(productId?._id || productId)}:${combinationId ? String(combinationId) : ""}`;
+
 
 router.post("/store/:slug/customer/otp/send", otpLimiter, async (req, res) => {
   try {
@@ -280,22 +285,35 @@ router.put("/store/:slug/customer/cart", requireCustomerAuth, async (req, res) =
     // Keep the original "added" time for lines that already existed, so the
     // seller-side cart list shows when a product was first added, not the
     // last time this device happened to sync.
-    const existing = await Customer.findById(req.customer.id).select("cart");
+    const existing = await Customer.findById(req.customer.id).select("cart").lean();
     const existingByKey = new Map(
-      (existing?.cart || []).map((c) => [`${c.product_id}:${c.combination_id || ""}`, c.added_at])
+      (existing?.cart || []).map((c) => [cartKeyOf(c.product_id, c.combination_id), c.added_at])
     );
 
-    const cart = items
-      .filter((i) => i.product_id && i.quantity > 0)
-      .map((i) => {
-        const key = `${i.product_id}:${i.combination_id || ""}`;
-        return {
-          product_id: i.product_id,
+    // Merge duplicate lines from the client so one product/variant = one line.
+    const merged = new Map();
+    for (const i of items) {
+      const productId = i.product_id?._id || i.product_id;
+      const qty = Number(i.quantity);
+      if (!productId || !(qty > 0)) continue;
+
+      const key = cartKeyOf(productId, i.combination_id);
+      const prev = merged.get(key);
+      if (prev) {
+        prev.quantity += qty;
+      } else {
+        merged.set(key, {
+          product_id: productId,
           combination_id: i.combination_id || null,
-          quantity: i.quantity,
-          added_at: existingByKey.get(key) || new Date(),
-        };
-      });
+          quantity: qty,
+        });
+      }
+    }
+
+    const cart = [...merged.entries()].map(([key, line]) => ({
+      ...line,
+      added_at: existingByKey.get(key) || new Date(),
+    }));
 
     await Customer.findByIdAndUpdate(req.customer.id, { $set: { cart } });
     res.json({ ok: true });
@@ -376,7 +394,9 @@ router.get("/seller/customers/carts", requireSellerAuth, async (req, res) => {
     const customers = await Customer.find({
       seller_id: req.user.id,
       "cart.0": { $exists: true },
-    }).select("name phone cart");
+    })
+      .select("name phone cart")
+      .lean(); // lean = no schema defaults, so missing added_at is NOT replaced with "now"
 
     const productIds = new Set();
     for (const c of customers) {
@@ -399,7 +419,9 @@ router.get("/seller/customers/carts", requireSellerAuth, async (req, res) => {
         let variantLabel = null;
         let unitPrice = product.price;
         if (item.combination_id) {
-          const combo = product.combinations.id(item.combination_id);
+          const combo = (product.combinations || []).find(
+            (c) => String(c._id) === String(item.combination_id)
+          );
           if (combo) {
             variantLabel = combo.label || null;
             if (combo.price != null) unitPrice = combo.price;
@@ -416,15 +438,18 @@ router.get("/seller/customers/carts", requireSellerAuth, async (req, res) => {
           variant_label: variantLabel,
           quantity: item.quantity,
           unit_price: unitPrice,
-          added_at: item.added_at,
+          added_at: item.added_at || null,
         });
       }
     }
 
-    rows.sort((a, b) => new Date(b.added_at) - new Date(a.added_at));
+    // Newest add first, across all customers
+    rows.sort((a, b) => (b.added_at ? new Date(b.added_at) : 0) - (a.added_at ? new Date(a.added_at) : 0));
     res.json({ items: rows });
   } catch (err) {
-    sendError(res, err);
+    console.error("carts route error:", err);
+    // TEMPORARY: show the real error on the page so it can be fixed. Remove later.
+    return res.status(500).json({ error: "DEBUG: " + err.message });
   }
 });
 

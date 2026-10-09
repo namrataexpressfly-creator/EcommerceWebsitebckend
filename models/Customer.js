@@ -2,7 +2,7 @@ import mongoose from "mongoose";
 
 const addressSchema = new mongoose.Schema(
   {
-    label: { type: String, default: "Home" }, 
+    label: { type: String, default: "Home" },
     line1: { type: String, required: true },
     line2: String,
     city: { type: String, required: true },
@@ -27,6 +27,9 @@ const customerSchema = new mongoose.Schema(
         product_id: { type: mongoose.Schema.Types.ObjectId, ref: "Product" },
         combination_id: { type: String, default: null },
         quantity: { type: Number, default: 1 },
+        // Time this line was added to the cart. Without this field in the
+        // schema, Mongoose silently drops added_at when saving.
+        added_at: { type: Date, default: Date.now },
       },
     ],
     is_active: { type: Boolean, default: true },

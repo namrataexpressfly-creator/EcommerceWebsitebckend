@@ -68,7 +68,7 @@ const storefrontConfigSchema = new mongoose.Schema(
       default: null,
       lowercase: true,
       trim: true,
-      
+
     },
 
     domain_status: {
@@ -77,7 +77,7 @@ const storefrontConfigSchema = new mongoose.Schema(
       default: "none",
     },
 
-    
+
     domain_verification_token: {
       type: String,
       default: null,
@@ -102,42 +102,42 @@ const storefrontConfigSchema = new mongoose.Schema(
     theme: {
       template_id: {
         type: String,
-        default: "classic",
+        default: "marketplace",
       },
 
       primary_color: {
         type: String,
-        default: "#1c5f45",
+        default: "#141414",
       },
 
       primary_dark: {
         type: String,
-        default: "#12432f",
+        default: "#000000",
       },
 
       primary_soft: {
         type: String,
-        default: "#e7f0e9",
+        default: "#ecece8",
       },
 
       accent_color: {
         type: String,
-        default: "#a8763e",
+        default: "#ffb400",
       },
 
       background_color: {
         type: String,
-        default: "#faf8f3",
+        default: "#f5f5f3",
       },
 
       text_color: {
         type: String,
-        default: "#15140f",
+        default: "#141414",
       },
 
       font_display: {
         type: String,
-        default: "Fraunces",
+        default: "Poppins",
       },
 
       font_body: {
@@ -147,7 +147,7 @@ const storefrontConfigSchema = new mongoose.Schema(
 
       layout_style: {
         type: String,
-        default: "classic",
+        default: "marketplace",
       },
     },
 

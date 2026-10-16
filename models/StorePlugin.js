@@ -8,7 +8,7 @@ const storePluginSchema = new mongoose.Schema(
     environment: { type: String, enum: ["sandbox", "live"], default: "live" },
     status: { type: String, enum: ["active", "inactive"], default: "inactive" },
 
-
+ 
     attributes: [
       {
         name: { type: String, required: true },
@@ -18,9 +18,12 @@ const storePluginSchema = new mongoose.Schema(
     ],
 
     token_cache: {
-      token: { type: String, default: "" },
+      token: { type: String, default: "" }, 
       expires_at: { type: Date, default: null },
     },
+
+
+    auth_scheme: { type: String, enum: ["bearer", "raw"], default: "bearer" },
 
     webhook_secret: { type: String, required: true },
 
@@ -30,12 +33,12 @@ const storePluginSchema = new mongoose.Schema(
       registered_at: { type: Date, default: null },
     },
 
-
+  
     courier_warehouses: [
       {
         warehouse_id: { type: mongoose.Schema.Types.ObjectId, ref: "Warehouse", required: true },
         courier_warehouse_id: { type: String, required: true },
-        signature: { type: String, default: "" },
+        signature: { type: String, default: "" }, 
         registered_at: { type: Date, default: Date.now },
         _id: false,
       },

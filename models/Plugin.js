@@ -2,12 +2,12 @@ import mongoose from "mongoose";
 
 const attributeSchema = new mongoose.Schema(
   {
-    name: { type: String, required: true, trim: true },
-    label: { type: String, default: "", trim: true },
-    help: { type: String, default: "", trim: true },
-    placeholder: { type: String, default: "", trim: true },
+    name: { type: String, required: true, trim: true }, 
+    label: { type: String, default: "", trim: true }, 
+    help: { type: String, default: "", trim: true }, 
+    placeholder: { type: String, default: "", trim: true }, 
     is_required: { type: Boolean, default: true },
-    is_secret: { type: Boolean, default: false },
+    is_secret: { type: Boolean, default: false }, 
   },
   { _id: false }
 );
@@ -24,7 +24,7 @@ const stepSchema = new mongoose.Schema(
 const domainSchema = new mongoose.Schema(
   {
     environment: { type: String, enum: ["sandbox", "live"], default: "live" },
-    url: { type: String, required: true, trim: true },
+    url: { type: String, required: true, trim: true }, 
   },
   { _id: false }
 );
@@ -37,15 +37,15 @@ const API_TYPES = ["token_generation", "get_rating", "order_rate", "order_create
 const apiSchema = new mongoose.Schema(
   {
     api_type: { type: String, enum: API_TYPES, required: true },
-    path: { type: String, required: true, trim: true },
+    path: { type: String, required: true, trim: true }, 
     method: { type: String, enum: ["GET", "POST", "PUT", "DELETE"], default: "POST" },
-    headers: { type: mongoose.Schema.Types.Mixed, default: {} },
-    parameter: { type: mongoose.Schema.Types.Mixed, default: {} },
+    headers: { type: mongoose.Schema.Types.Mixed, default: {} }, 
+    parameter: { type: mongoose.Schema.Types.Mixed, default: {} }, 
     webhook_url: { type: String, default: "" },
     response_type: { type: String, enum: ["json", "xml"], default: "json" },
 
     response_mapping: { type: mongoose.Schema.Types.Mixed, default: {} },
-
+  
     webhook_mapping: { type: mongoose.Schema.Types.Mixed, default: {} },
   },
   { _id: false }
@@ -57,7 +57,7 @@ const pluginSchema = new mongoose.Schema(
     slug: { type: String, required: true, unique: true, lowercase: true, trim: true },
     logo: { type: String, default: "" },
     description: { type: String, default: "" },
-
+  
     setup_steps: { type: [stepSchema], default: [] },
     docs_url: { type: String, default: "", trim: true },
     other_detail: { type: mongoose.Schema.Types.Mixed, default: {} },

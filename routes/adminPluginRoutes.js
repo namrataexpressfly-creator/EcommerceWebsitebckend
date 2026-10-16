@@ -147,7 +147,7 @@ router.put("/:id", route(async (req, res) => {
   }
   delete data.standard_paths;
   const before = plugin.toObject();
-  plugin.set(data);
+  plugin.set(data); 
 
   if (req.staff.type === "developer" && plugin.review_status !== "draft") {
     const after = plugin.toObject();

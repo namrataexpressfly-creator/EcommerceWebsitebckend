@@ -233,7 +233,8 @@ The developer can change a path when connecting your courier, but the defaults a
 
 ```json
 {
-  "tracking_url": "https://api.expressfly.example/api/webhook/plugin/65f1c0a2b4e8d9123456aaaa/Xk29..."
+  "webhook_secret": "Xk29...",
+  "track_order_endpoint": "https://api.expressfly.example/api/webhook/plugin/65f1c0a2b4e8d9123456aaaa/Xk29..."
 }
 ```
 
@@ -245,12 +246,12 @@ The developer can change a path when connecting your courier, but the defaults a
 }
 ```
 
-- Store `tracking_url` against this seller's account and call it every time a shipment's status changes (see below).
+- Store `webhook_secret` and `track_order_endpoint` against this seller's account and call it every time a shipment's status changes (see below).
 - The URL contains a secret. Keep it private and use it exactly as given. Calling this endpoint again replaces the URL.
 
 ## Tracking webhook (you call Expressfly)
 
-Send an HTTP POST with a JSON body to the `tracking_url` you received from /set-webhook-url every time a shipment gets a new scan. Expressfly finds the shipment by `awb`.
+Send an HTTP POST with a JSON body to the `track_order_endpoint` you received from /set-webhook-url every time a shipment gets a new scan. Expressfly finds the shipment by `awb`.
 
 **Request**
 

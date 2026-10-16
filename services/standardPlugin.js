@@ -2,10 +2,10 @@ export const STANDARD_VERSION = "1";
 
 export const DEFAULT_PATHS = {
   token_generation: "/login",
-  create_warehouse: "/create-warehouse",
+  create_warehouse: "/admin/users/warehouse/create",
   get_rating: "/get-rates",
   order_create: "/ship-orders",
-  set_webhook: "/set-webhook-url",
+  set_webhook: "/admin/store-webhooks",
 };
 
 
@@ -72,20 +72,16 @@ export function buildStandardApis(paths = {}) {
       response_type: "json",
       headers: { ...AUTH },
       parameter: {
-        warehouse_ref: "{{pickup.id}}",
-        name: "{{pickup.name}}",
-        code: "{{pickup.code}}",
-        phone: "{{pickup.phone}}",
-        address: {
-          line1: "{{pickup.line1}}",
-          line2: "{{pickup.line2}}",
-          city: "{{pickup.city}}",
-          state: "{{pickup.state}}",
-          pincode: "{{pickup.pincode}}",
-          country: "IN",
-        },
+        ware_house_name: "{{pickup.name}}",
+        contact_person_name: "{{pickup.contact_name}}",
+        contact_no: "{{pickup.phone10}}",
+        pincode: "{{pickup.pincode}}",
+        address_line1: "{{pickup.address_line}}",
+        city: "{{pickup.city}}",
+        state: "{{pickup.state}}",
       },
-      response_mapping: { warehouse_id: "warehouse_id" },
+  
+      response_mapping: { warehouse_id: "_id" },
     },
     {
       api_type: "get_rating",
@@ -93,17 +89,18 @@ export function buildStandardApis(paths = {}) {
       method: "POST",
       response_type: "json",
       headers: { ...AUTH },
+
       parameter: {
-        warehouse_id: "{{courier_warehouse_id}}",
-        pickup_pincode: "{{pickup.pincode}}",
-        delivery_pincode: "{{delivery.pincode}}",
-        payment_mode: "{{payment.type}}",
-        cod_amount: "{{payment.cod_amount}}",
-        declared_value: "{{order.subtotal}}",
-        weight_kg: "{{package.chargeable_weight_kg}}",
-        length_cm: "{{package.length_cm}}",
-        width_cm: "{{package.width_cm}}",
-        height_cm: "{{package.height_cm}}",
+        delivery_pincode: "{{delivery.pincode_number}}",
+        pickup_pincode: "{{pickup.pincode_number}}",
+        dimensions: {
+          length: "{{package.dim_length}}",
+          width: "{{package.dim_width}}",
+          height: "{{package.dim_height}}",
+        },
+        order_value: "{{order.subtotal}}",
+        payment_type: "{{payment.type}}",
+        weight: "{{package.chargeable_weight_kg}}",
       },
       response_mapping: { rates: "rates", rate_item: { id: "id", name: "courier_name", charge: "charge", eta: "eta" } },
     },
@@ -113,22 +110,36 @@ export function buildStandardApis(paths = {}) {
       method: "POST",
       response_type: "json",
       headers: { ...AUTH },
+ 
       parameter: {
-        rate_id: "{{rate.id}}",
-        order_id: "{{order.id}}",
-        warehouse_id: "{{courier_warehouse_id}}",
-        payment_mode: "{{payment.type}}",
+        logistic_id: "{{rate.id}}",
+        name: "{{delivery.name}}",
+        mobile_no: "{{delivery.phone10}}",
+        alternate_mobile_no: null,
+        email_id: "{{delivery.email}}",
+        shipment_type: 0,
+        receiver_address: "{{delivery.address_line}}",
+        receiver_pincode: "{{delivery.pincode}}",
+        receiver_city: "{{delivery.city}}",
+        receiver_state: "{{delivery.state}}",
+        receiver_landmark: null,
+        order_no: "{{order.number}}",
+        order_type: "{{payment.order_type}}",
+        product_quantity: "{{order.quantity}}",
         cod_amount: "{{payment.cod_amount}}",
-        declared_value: "{{order.subtotal}}",
-        package: {
-          weight_kg: "{{package.chargeable_weight_kg}}",
-          length_cm: "{{package.length_cm}}",
-          width_cm: "{{package.width_cm}}",
-          height_cm: "{{package.height_cm}}",
-        },
-        pickup: person("pickup"),
-        delivery: person("delivery"),
-        items: "{{items}}",
+        product_discount: "{{order.discount}}",
+        order_total_tax_amount: "{{order.tax}}",
+        order_total_shipping_amount: "{{order.shipping}}",
+        order_value: "{{order.subtotal}}",
+        physical_weight: "{{package.weight_kg}}",
+        product_length: "{{package.dim_length}}",
+        product_width: "{{package.dim_width}}",
+        product_height: "{{package.dim_height}}",
+        dead_weight: "{{package.weight_kg}}",
+        chargeable_weight: "{{package.chargeable_weight_kg}}",
+        eway_bill_number: null,
+        productdetatis: "{{items_courier}}",
+        pickup_address_id: "{{courier_warehouse_id}}",
       },
       response_mapping: {
         awb: "awb",
@@ -144,7 +155,11 @@ export function buildStandardApis(paths = {}) {
       method: "POST",
       response_type: "json",
       headers: { ...AUTH },
-      parameter: { tracking_url: "{{tracking_url}}" },
+
+      parameter: {
+        webhook_secret: "{{webhook_secret}}",
+        track_order_endpoint: "{{tracking_url}}",
+      },
       response_mapping: {},
     },
   ];
@@ -162,9 +177,17 @@ export function buildStandardFields(input = []) {
   });
 }
 
+const LEGACY_DEFAULT_PATHS = {
+  create_warehouse: "/create-warehouse",
+  set_webhook: "/set-webhook-url",
+};
+
 export function pathsFromApis(apis = []) {
   const out = {};
-  for (const a of apis) if (DEFAULT_PATHS[a.api_type]) out[a.api_type] = a.path;
+  for (const a of apis) {
+    if (!DEFAULT_PATHS[a.api_type]) continue;
+    out[a.api_type] = LEGACY_DEFAULT_PATHS[a.api_type] === String(a.path || "").trim() ? DEFAULT_PATHS[a.api_type] : a.path;
+  }
   return out;
 }
 
@@ -224,16 +247,18 @@ export const STANDARD_CONTRACT = {
       path: DEFAULT_PATHS.create_warehouse,
       when: "Before the first rate check or shipment from a pickup warehouse, and again if the seller edits that warehouse.",
       request: {
-        warehouse_ref: "65f1c0a2b4e8d91234567890",
-        name: PICKUP.name,
-        code: "MUM01",
-        phone: PICKUP.phone,
-        address: { line1: PICKUP.line1, line2: PICKUP.line2, city: PICKUP.city, state: PICKUP.state, pincode: PICKUP.pincode, country: "IN" },
+        ware_house_name: PICKUP.name,
+        contact_person_name: "Amit",
+        contact_no: "9876543210",
+        pincode: PICKUP.pincode,
+        address_line1: PICKUP.line1,
+        city: PICKUP.city,
+        state: PICKUP.state,
       },
-      response: { success: true, warehouse_id: "CW-10045" },
+      response: { status: 1, message: "Warehouse address added successfully.", data: { _id: "6a16e370b6d62034488a493a", warehouse_name: PICKUP.name } },
       notes: [
-        "`warehouse_ref` is Expressfly's own id. Calling this again with the same `warehouse_ref` must update the warehouse and return the same `warehouse_id`.",
-        "Expressfly sends your `warehouse_id` back in /get-rates and /ship-orders.",
+        "`data._id` is the pickup address id. Expressfly sends it back as `pickup_address_id` when it creates a shipment.",
+        "`contact_no` is a 10-digit number. `address_line1` contains the full street address.",
       ],
     },
     {
@@ -243,16 +268,12 @@ export const STANDARD_CONTRACT = {
       path: DEFAULT_PATHS.get_rating,
       when: "When a seller clicks Ship on an order and picks this courier.",
       request: {
-        warehouse_id: "CW-10045",
-        pickup_pincode: PICKUP.pincode,
-        delivery_pincode: DELIVERY.pincode,
-        payment_mode: "cod",
-        cod_amount: 1499,
-        declared_value: 1499,
-        weight_kg: 0.75,
-        length_cm: 25,
-        width_cm: 18,
-        height_cm: 6,
+        delivery_pincode: Number(DELIVERY.pincode),
+        pickup_pincode: Number(PICKUP.pincode),
+        dimensions: { length: 25, width: 18, height: 6 },
+        order_value: 1499,
+        payment_type: "cod",
+        weight: 0.75,
       },
       response: {
         success: true,
@@ -274,29 +295,50 @@ export const STANDARD_CONTRACT = {
       path: DEFAULT_PATHS.order_create,
       when: "When the seller confirms a rate.",
       request: {
-        rate_id: "RATE-7f3a91",
-        order_id: "TRK-9X2KQ7",
-        warehouse_id: "CW-10045",
-        payment_mode: "cod",
+        logistic_id: "69afed0f1ded2bbd26ca3265",
+        name: DELIVERY.name,
+        mobile_no: "9033786187",
+        alternate_mobile_no: null,
+        email_id: null,
+        shipment_type: 0,
+        receiver_address: DELIVERY.line1,
+        receiver_pincode: DELIVERY.pincode,
+        receiver_city: DELIVERY.city,
+        receiver_state: DELIVERY.state,
+        receiver_landmark: null,
+        order_no: "TRK-9X2KQ7",
+        order_type: 1,
+        product_quantity: 1,
         cod_amount: 1499,
-        declared_value: 1499,
-        package: { weight_kg: 0.75, length_cm: 25, width_cm: 18, height_cm: 6 },
-        pickup: PICKUP,
-        delivery: DELIVERY,
-        items: [{ name: "Cotton Kurta", sku: "KUR-001", quantity: 1, price: 1499 }],
+        product_discount: 0,
+        order_total_tax_amount: 0,
+        order_total_shipping_amount: 0,
+        order_value: 1499,
+        physical_weight: 0.75,
+        product_length: 25,
+        product_width: 18,
+        product_height: 6,
+        dead_weight: 0.75,
+        chargeable_weight: 0.75,
+        eway_bill_number: null,
+        productdetatis: [{ product_sku: "KUR-001", product_name: "Cotton Kurta", product_quantity: 1, product_value: 1499, actual_value: 0, gst_tax: 0 }],
+        pickup_address_id: "6a16e370b6d62034488a493a",
       },
       response: {
-        success: true,
-        awb: "77052358062",
-        courier_name: "Mock Express",
-        tracking_url: "https://courier.example/track/77052358062",
-        label_url: "https://courier.example/labels/77052358062.pdf",
-        estimated_delivery: "2026-10-10T00:00:00Z",
+        status: 1,
+        message: "Order created and shipped successfully",
+        data: {
+          order_id: "6a60b827ca1cbccb0b7fa9d8",
+          awb: "77887990250",
+          shipping_label_url: "https://courier.example/api/admin/shipping_label/generate/pdf/6a60b827ca1cbccb0b7fa9d8",
+          logistic_id: "69afed0f1ded2bbd26ca3265",
+        },
       },
       notes: [
-        "`rate_id` is the `id` you returned from /get-rates.",
-        "`awb` is required. `tracking_url`, `label_url` and `estimated_delivery` (ISO 8601) are optional but recommended.",
-        "`order_id` is Expressfly's tracking id for the order. Treat a repeated `order_id` as a duplicate and return the existing shipment.",
+        "`logistic_id` is the `logistic_id` of the rate the seller picked in the rate calculator. `pickup_address_id` is the `data._id` returned when the warehouse was created.",
+        "`order_type` is 0 for prepaid and 1 for cash on delivery (`cod_amount` is 0 for prepaid). `shipment_type` is always 0 (forward).",
+        "`order_no` is Expressfly's tracking id for the order. Treat a repeated `order_no` as a duplicate.",
+        "`data.awb` is required. `data.shipping_label_url` is shown to the seller as the label link.",
       ],
     },
     {

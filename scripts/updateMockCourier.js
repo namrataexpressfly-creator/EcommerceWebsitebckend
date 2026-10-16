@@ -13,9 +13,9 @@ export function applyStandard(plugin) {
     { name: "password", label: "Password", help: "For testing use: test-pass" },
   ]);
   plugin.api_domains = [{ environment: "live", url: "http://localhost:5005" }];
-  plugin.apis = buildStandardApis();
+  plugin.apis = buildStandardApis(); 
   plugin.status = "active";
-  plugin.review_status = "approved";
+  plugin.review_status = "approved"; 
   return plugin;
 }
 

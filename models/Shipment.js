@@ -5,7 +5,7 @@ const eventSchema = new mongoose.Schema(
     status: { type: String, required: true },
     note: { type: String, default: "" },
     at: { type: Date, default: Date.now },
-    ref: { type: String, default: "" },
+    ref: { type: String, default: "" }, 
   },
   { _id: false }
 );

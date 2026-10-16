@@ -68,7 +68,7 @@ const storefrontConfigSchema = new mongoose.Schema(
       default: null,
       lowercase: true,
       trim: true,
-
+      
     },
 
     domain_status: {
@@ -77,7 +77,7 @@ const storefrontConfigSchema = new mongoose.Schema(
       default: "none",
     },
 
-
+    
     domain_verification_token: {
       type: String,
       default: null,

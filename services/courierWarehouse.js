@@ -1,5 +1,5 @@
 import crypto from "crypto";
-import { callPluginApi, PluginApiError } from "./pluginEngine.js";
+import { callPluginApi, PluginApiError, pluginApis } from "./pluginEngine.js";
 
 const hasApi = (plugin, type) => !plugin.adapter_key && plugin.apis.some((a) => a.api_type === type);
 
@@ -17,8 +17,28 @@ export async function ensureCourierWarehouse({ plugin, storePlugin, warehouse, c
   const known = storePlugin.courier_warehouses.find((w) => String(w.warehouse_id) === String(warehouse._id));
   if (known?.courier_warehouse_id && known.signature === signature) return known.courier_warehouse_id;
 
-  const { raw, mapped } = await callPluginApi({ plugin, storePlugin, apiType: "create_warehouse", context });
-  const id = mapped.warehouse_id;
+  let result;
+  try {
+    result = await callPluginApi({ plugin, storePlugin, apiType: "create_warehouse", context });
+  } catch (first) {
+
+    const nameMissing = first instanceof PluginApiError && first.upstreamStatus === 400 && /warehouse name/i.test(`${first.details || ""} ${first.message}`);
+    if (!nameMissing) throw first;
+    const base = pluginApis(plugin).find((a) => a.api_type === "create_warehouse")?.parameter || {};
+    for (const key of ["warehouse_name", "warehouseName", "name"]) {
+      const parameter = Object.fromEntries(Object.entries(base).map(([k, v]) => [k === "ware_house_name" ? key : k, v]));
+      try {
+        result = await callPluginApi({ plugin, storePlugin, apiType: "create_warehouse", context, parameter });
+        console.info(`[plugin] ${plugin.app_name} accepted the pickup warehouse when its name was sent as "${key}".`);
+        break;
+      } catch (err) {
+        if (!(err instanceof PluginApiError && err.upstreamStatus === 400)) throw err;
+      }
+    }
+    if (!result) throw first;
+  }
+  const { raw, mapped } = result;
+  const id = mapped.warehouse_id ?? raw?.warehouse_id ?? raw?.data?.warehouse_id ?? raw?.data?._id;
   if (!id) {
     throw new PluginApiError(`${plugin.app_name} did not return a warehouse id.`, { details: JSON.stringify(raw).slice(0, 300) });
   }

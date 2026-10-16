@@ -15,6 +15,9 @@ import {
   missingRequired,
   normalizeEvents,
   normalizeRates,
+  rateDetails,
+  courierNote,
+  pluginApis,
   mapCourierStatus,
   PluginApiError,
   route,
@@ -24,7 +27,7 @@ import { ensureCourierWarehouse } from "../services/courierWarehouse.js";
 import { ensureWebhookRegistered, trackingWebhookUrl } from "../services/courierWebhook.js";
 
 const router = express.Router();
-router.use(requireSellerAuth);
+router.use(requireSellerAuth); 
 
 const bad = (res, msg, code = StatusCodes.BAD_REQUEST) => res.status(code).json({ error: msg });
 const SHIPPABLE = ["pending", "confirmed", "packed", "shipped"];
@@ -68,11 +71,16 @@ async function loadReadyPlugin(req, res, storePluginId) {
   return { plugin, storePlugin };
 }
 
-async function pickWarehouse(order, warehouseId) {
+async function pickWarehouse(order, warehouseId, sellerId) {
   const ids = (order.pickup_warehouse_ids || []).map(String);
   const id = warehouseId ? String(warehouseId) : ids[0];
-  if (!id || !ids.includes(id)) return null;
-  return Warehouse.findById(id);
+  if (!id || !mongoose.isValidObjectId(id)) return null;
+  if (ids.includes(id)) return Warehouse.findById(id);
+  // Same rule as /options: any of the seller's own active warehouses is allowed while the warehouse can still change.
+  const canChange =
+    ["pending", "confirmed", "packed"].includes(order.status) &&
+    !(await Shipment.exists({ order_id: order._id, is_active: true }));
+  return canChange ? Warehouse.findOne({ _id: id, seller_id: sellerId, is_active: true }) : null;
 }
 
 
@@ -80,11 +88,18 @@ router.get("/:orderId/options", route(async (req, res) => {
   const order = await loadOrder(req, res);
   if (!order) return;
 
-  const [storePlugins, warehouses, shipments] = await Promise.all([
+  const [storePlugins, orderWarehouses, allWarehouses, shipments] = await Promise.all([
     StorePlugin.find({ seller_id: req.user.id, status: "active" }),
-    Warehouse.find({ _id: { $in: order.pickup_warehouse_ids || [] } }).select("name code address contact_phone"),
+    Warehouse.find({ _id: { $in: order.pickup_warehouse_ids || [] } }).select("name code address contact_phone priority").lean(),
+    Warehouse.find({ seller_id: req.user.id, is_active: true }).select("name code address contact_phone priority").sort({ priority: -1, name: 1 }).lean(),
     Shipment.find({ order_id: order._id, is_active: true }).select("warehouse_id awb_number courier_name status tracking_url"),
   ]);
+ 
+  const orderIds = new Set((order.pickup_warehouse_ids || []).map(String));
+  const canChange = shipments.length === 0 && ["pending", "confirmed", "packed"].includes(order.status);
+  const warehouses = (canChange ? allWarehouses : orderWarehouses)
+    .map((w) => ({ ...w, for_order: orderIds.has(String(w._id)) }))
+    .sort((a, b) => Number(b.for_order) - Number(a.for_order));
   const plugins = await Plugin.find({ _id: { $in: storePlugins.map((s) => s.plugin_id) } });
   const pById = new Map(plugins.map((p) => [String(p._id), p]));
 
@@ -105,6 +120,8 @@ router.get("/:orderId/options", route(async (req, res) => {
     can_ship: SHIPPABLE.includes(order.status) && ["paid", "cod_pending"].includes(order.payment_status),
     plugins: options,
     warehouses,
+    can_change_warehouse: canChange,
+    delivery: { city: order.shipping_address?.city || "", state: order.shipping_address?.state || "", pincode: order.shipping_address?.pincode || "" },
     shipments,
     redirect_to_plugins: !options.some((o) => o.ready),
   });
@@ -116,7 +133,7 @@ router.post("/:orderId/rates", route(async (req, res) => {
   if (!order) return;
   const found = await loadReadyPlugin(req, res, req.body.store_plugin_id);
   if (!found) return;
-  const warehouse = await pickWarehouse(order, req.body.warehouse_id);
+  const warehouse = await pickWarehouse(order, req.body.warehouse_id, req.user.id);
   if (!warehouse) return bad(res, "Pickup warehouse not found for this order.");
 
   let context;
@@ -127,15 +144,29 @@ router.post("/:orderId/rates", route(async (req, res) => {
   }
 
   const { plugin, storePlugin } = found;
-  context.courier_warehouse_id = await ensureCourierWarehouse({ plugin, storePlugin, warehouse, context });
   const apiType = plugin.adapter_key || plugin.apis.some((a) => a.api_type === "get_rating") ? "get_rating" : "order_rate";
+
+  const rateApi = pluginApis(plugin).find((a) => a.api_type === apiType);
+  if (!rateApi || JSON.stringify(rateApi.parameter || {}).includes("courier_warehouse_id")) {
+    context.courier_warehouse_id = await ensureCourierWarehouse({ plugin, storePlugin, warehouse, context });
+  }
   const { raw, api, mapped } = await callPluginApi({ plugin, storePlugin, apiType, context });
 
   const rates = api ? normalizeRates(raw, api) : mapped.rates || [];
+  if (!rates.length) {
+  
+    console.warn(`[shipping] ${plugin.app_name} returned no usable rates for order ${order.tracking_token}. Courier response: ${JSON.stringify(raw).slice(0, 1000)}`);
+  }
   res.json({
     warehouse_id: warehouse._id,
     package: context.package,
-    rates: rates.map(({ _raw, ...r }) => r),
+    route: {
+      from: { city: context.pickup?.city || "", pincode: context.pickup?.pincode || "" },
+      to: { city: context.delivery?.city || "", pincode: context.delivery?.pincode || "" },
+    },
+    note: rates.length ? "" : courierNote(raw),
+
+    rates: rates.map(({ _raw, ...r }) => ({ ...r, details: rateDetails(_raw) })),
   });
 }));
 
@@ -148,7 +179,7 @@ router.post("/:orderId/ship", route(async (req, res) => {
 
   const found = await loadReadyPlugin(req, res, req.body.store_plugin_id);
   if (!found) return;
-  const warehouse = await pickWarehouse(order, req.body.warehouse_id);
+  const warehouse = await pickWarehouse(order, req.body.warehouse_id, req.user.id);
   if (!warehouse) return bad(res, "Pickup warehouse not found for this order.");
 
   const already = await Shipment.findOne({ order_id: order._id, warehouse_id: warehouse._id, is_active: true });

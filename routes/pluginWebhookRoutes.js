@@ -65,7 +65,7 @@ async function handleStandardWebhook(req, res, sp) {
       ref: String(l._id ?? "").trim(),
     };
   });
-  if (scans.length === 0) scans = [{ status: label, note: "", at: now, ref: "" }];
+  if (scans.length === 0) scans = [{ status: label, note: "", at: now, ref: "" }]; 
   scans.sort((a, b) => a.at - b.at);
 
 

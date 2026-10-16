@@ -5,10 +5,10 @@ import { StatusCodes } from "http-status-codes";
 import { requireSellerAuth } from "../middleware/auth.js";
 import Plugin from "../models/Plugin.js";
 import { SELLER_VISIBLE, isSellerVisible } from "../services/pluginReview.js";
-import { ensureWebhookRegistered, trackingWebhookUrl } from "../services/courierWebhook.js";
+import { ensureWebhookRegistered, supportsWebhookRegistration, trackingWebhookUrl } from "../services/courierWebhook.js";
 import StorePlugin from "../models/StorePlugin.js";
 import { encrypt, decrypt, maskSecret } from "../utils/pluginCrypto.js";
-import { callPluginApi, missingRequired, route } from "../services/pluginEngine.js";
+import { callPluginApi, loginFresh, missingRequired, route } from "../services/pluginEngine.js";
 
 const router = express.Router();
 router.use(requireSellerAuth);
@@ -26,6 +26,8 @@ function publicStorePlugin(req, plugin, sp) {
     ready: plugin.status === "active" && sp.status === "active" && missing.length === 0,
     missing,
     webhook_url: webhookUrl(req, sp),
+    webhook_registered: Boolean(sp.webhook?.registered_url),
+    webhook_registered_at: sp.webhook?.registered_at || null,
     attributes: (plugin.attributes || []).map((def) => {
       const value = decrypt(sp.attributes.find((a) => a.name === def.name)?.value);
       return {
@@ -55,7 +57,7 @@ router.get("/", route(async (req, res) => {
         logo: p.logo,
         description: p.description,
         other_detail: p.other_detail,
-        attributes: p.attributes,
+        attributes: p.attributes, 
         setup_steps: p.setup_steps || [],
         docs_url: p.docs_url || "",
         integration: p.integration || "custom",
@@ -154,7 +156,8 @@ router.post("/store/:id/test", route(async (req, res) => {
   if (!plugin.adapter_key && !plugin.apis.some((a) => a.api_type === "token_generation")) {
     return res.json({ ok: true, message: "Saved. This courier has no login step to test." });
   }
-  await callPluginApi({ plugin, storePlugin: sp, apiType: "token_generation" });
+  if (plugin.adapter_key) await callPluginApi({ plugin, storePlugin: sp, apiType: "token_generation" });
+  else await loginFresh(plugin, sp);
 
 
   try {
@@ -172,6 +175,40 @@ router.post("/store/:id/test", route(async (req, res) => {
       webhook_registered: false,
     });
   }
+}));
+
+
+router.post("/store/:id/install", route(async (req, res) => {
+  if (!mongoose.isValidObjectId(req.params.id)) return notFound(res, "Plugin setup");
+  const sp = await StorePlugin.findOne({ _id: req.params.id, seller_id: req.user.id });
+  if (!sp) return notFound(res, "Plugin setup");
+  const plugin = await Plugin.findById(sp.plugin_id);
+  if (!plugin) return notFound(res);
+
+  if (!isSellerVisible(plugin)) {
+    return res.status(StatusCodes.CONFLICT).json({ error: "This plugin is not available right now. It may be under review." });
+  }
+  const missing = missingRequired(plugin, sp);
+  if (missing.length) return res.status(StatusCodes.BAD_REQUEST).json({ error: `Please fill in: ${missing.join(", ")}.` });
+
+  if (plugin.adapter_key) await callPluginApi({ plugin, storePlugin: sp, apiType: "token_generation" });
+  else if (plugin.apis.some((a) => a.api_type === "token_generation")) await loginFresh(plugin, sp);
+
+  if (!supportsWebhookRegistration(plugin)) {
+    return res.json({ ok: true, installed: true, message: "Installed. Connected successfully.", store_plugin: publicStorePlugin(req, plugin, sp) });
+  }
+
+  try {
+    await ensureWebhookRegistered({ plugin, storePlugin: sp, url: webhookUrl(req, sp), force: true });
+  } catch (e) {
+    return res.status(StatusCodes.BAD_REQUEST).json({ error: `Connected, but the webhook could not be installed: ${e.message}` });
+  }
+  res.json({
+    ok: true,
+    installed: true,
+    message: "Installed successfully. Tracking updates are switched on.",
+    store_plugin: publicStorePlugin(req, plugin, sp),
+  });
 }));
 
 

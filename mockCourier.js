@@ -4,12 +4,12 @@ const PORT = 5005;
 const TOKEN = "mock-token-123";
 const TOKEN_TTL_SECONDS = 3600;
 
-const warehouses = new Map();
+const warehouses = new Map(); 
 const rates = new Map();
-const shipments = new Map();
-const byOrder = new Map();
-let trackingUrl = null;
-const lastPayload = new Map();
+const shipments = new Map(); 
+const byOrder = new Map(); 
+let trackingUrl = null; 
+const lastPayload = new Map(); 
 const STATUS_LABELS = {
   created: "Created",
   picked_up: "Picked Up",
@@ -49,7 +49,7 @@ http
     const body = req.method === "POST" ? await readJson(req) : {};
     console.log(`${req.method} ${url.pathname}${url.search}`, body && Object.keys(body).length ? JSON.stringify(body) : "");
 
-
+    
     if (req.method === "GET" && url.pathname === "/simulate") {
       if (!trackingUrl) return fail(res, "No tracking URL registered yet. In Expressfly click 'Save & test connection' first.");
       const awb = url.searchParams.get("awb");
@@ -136,7 +136,7 @@ http
       if (m.length) return fail(res, `Missing: ${m.join(", ")}`);
       if (!Array.isArray(body.items) || !body.items.length) return fail(res, "items must be a non-empty list.");
       if (!rates.has(body.rate_id)) return fail(res, `Unknown rate_id ${body.rate_id}. Call /get-rates first.`);
-      if (byOrder.has(body.order_id)) return send(res, 200, { success: true, ...shipments.get(byOrder.get(body.order_id)) });
+      if (byOrder.has(body.order_id)) return send(res, 200, { success: true, ...shipments.get(byOrder.get(body.order_id)) }); 
       const awb = `MOCK${Date.now()}${++counter}`;
       const shipment = {
         awb,
@@ -152,8 +152,9 @@ http
 
     // 5) set tracking webhook url
     if (url.pathname === "/set-webhook-url") {
-      if (!/^https?:\/\//i.test(String(body.tracking_url || ""))) return fail(res, "tracking_url must be an http(s) URL.");
-      trackingUrl = body.tracking_url;
+      const hook = body.track_order_endpoint || body.tracking_url;
+      if (!/^https?:\/\//i.test(String(hook || ""))) return fail(res, "track_order_endpoint must be an http(s) URL.");
+      trackingUrl = hook;
       console.log("  tracking_url stored:", trackingUrl);
       return send(res, 200, { success: true });
     }

@@ -1,5 +1,5 @@
 import { decrypt, encrypt } from "../utils/pluginCrypto.js";
-import { buildStandardApis, pathsFromApis } from "./standardPlugin.js";
+import { buildStandardApis, pathsFromApis, mapStandardStatus } from "./standardPlugin.js";
 export class PluginApiError extends Error {
   constructor(message, { status = 502, upstreamStatus = null, details = null, url = null } = {}) {
     super(message);
@@ -429,10 +429,14 @@ export function normalizeEvents(raw, api) {
 export function mapCourierStatus(text) {
   const s = String(text || "").toLowerCase();
   if (!s) return null;
-  if (/out for delivery|ofd/.test(s)) return "out_for_delivery";
-  if (/rto|return/.test(s)) return "returned";
+  const known = mapStandardStatus(text);
+  if (known.known) return known.value;
+  if (/not picked|not pickup|manifest|pending|ready to ship/.test(s)) return null;
+  if (/out for delivery|ofd/.test(s) && !/rto|return/.test(s)) return "out_for_delivery";
+  if (/rto|return/.test(s)) return /deliver/.test(s) && !/undeliver/.test(s) ? "returned" : null; // only a finished return changes the order
   if (/cancel/.test(s)) return "cancelled";
+  if (/undeliver|ndr/.test(s)) return null;
   if (/deliver/.test(s)) return "delivered";
-  if (/transit|picked|pick up|pickup done|shipped|dispatch|manifest/.test(s)) return "shipped";
+  if (/transit|picked|pick up|pickup done|shipped|dispatch/.test(s)) return "shipped";
   return null;
 }

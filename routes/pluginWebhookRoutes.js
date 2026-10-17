@@ -44,7 +44,7 @@ async function handleStandardWebhook(req, res, sp) {
   const awb = String(body.awb ?? "").trim();
   if (!awb) return res.status(400).json({ success: false, message: "awb is required." });
 
-  const label = String(body.last_tracking_status ?? "").trim();
+  const label = String(body.last_tracking_status ?? body.status ?? "").trim();
   const logs = Array.isArray(body.tracking_logs) ? body.tracking_logs.filter((l) => l && typeof l === "object") : [];
   if (!label && logs.length === 0) {
     return res.status(400).json({ success: false, message: "last_tracking_status or tracking_logs is required." });
@@ -82,6 +82,7 @@ async function handleStandardWebhook(req, res, sp) {
 
   let st = mapStandardStatus(label);
   if (!st.known) st = mapStandardStatus(scans[scans.length - 1].status);
+  if (!st.known && (body.order_status_id ?? body.status_id) != null) st = mapStandardStatus(String(body.order_status_id ?? body.status_id));
 
   if (st.value && !FINAL_SHIPMENT_STATUSES.includes(shipment.status)) shipment.status = st.value;
 

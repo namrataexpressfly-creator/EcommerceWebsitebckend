@@ -15,27 +15,54 @@ export const STANDARD_FIELDS = [
 ];
 
 
+// Tracking labels the courier sends in `last_tracking_status` / `status` (and their ids, `order_status_id`).
+// value = the shipment status Expressfly sets (the order status follows it); null = recorded on the timeline only.
 export const STATUS_LABELS = [
-  { label: "Created", value: null, effect: "Shipment created. Recorded on the timeline only." },
-  { label: "Picked Up", value: "shipped", effect: "Collected from the warehouse. Order becomes Shipped." },
-  { label: "In Transit", value: "shipped", effect: "Moving between hubs. Order becomes Shipped." },
-  { label: "Out For Delivery", value: "out_for_delivery", effect: "Out with the delivery agent. Order becomes Out for delivery." },
-  { label: "Delivered", value: "delivered", effect: "Delivered to the customer. Order becomes Delivered." },
-  { label: "Undelivered", value: null, effect: "A delivery attempt failed. Recorded on the timeline only." },
-  { label: "RTO Initiated", value: null, effect: "Return to origin started. Recorded on the timeline only." },
-  { label: "RTO Delivered", value: "returned", effect: "Parcel is back with the seller. Order becomes Returned." },
-  { label: "Cancelled", value: "cancelled", effect: "Shipment cancelled. Order status updated." },
+  { id: null, label: "Pending", value: null, effect: "Ready to ship, not yet shipped. Timeline only." },
+  { id: 1, label: "Created", value: null, effect: "Order created with the courier. Timeline only." },
+  { id: 8, label: "Not Picked", value: null, effect: "Manifested, but the courier has not collected the parcel yet. Timeline only; the order status does not change." },
+  { id: 20, label: "Picked Up", value: "shipped", effect: "Collected from the warehouse. Order becomes Shipped." },
+  { id: 3, label: "In Transit", value: "shipped", effect: "Pickup done, moving between hubs. Order becomes Shipped." },
+  { id: 4, label: "Reached at Destination", value: "shipped", effect: "Reached the destination hub, still in transit. Order stays Shipped." },
+  { id: 22, label: "ODA", value: null, effect: "Delivery address is in an out-of-delivery area (ODA). Timeline only." },
+  { id: 5, label: "Dispatched", value: "out_for_delivery", effect: "Out for delivery (OFD). Order becomes Out for delivery." },
+  { id: 18, label: "NDR", value: null, effect: "Non-delivery report: a delivery attempt failed. Timeline only." },
+  { id: 6, label: "Delivered", value: "delivered", effect: "Delivered to the customer. Order becomes Delivered." },
+  { id: 7, label: "Cancelled", value: "cancelled", effect: "Shipment cancelled. Order status updated." },
+  { id: 19, label: "OTP Verified Cancellation", value: "cancelled", effect: "Cancelled after the customer verified with an OTP. Treated as Cancelled." },
+  { id: 9, label: "RTO Manifested", value: null, effect: "Return to origin created. Timeline only." },
+  { id: 10, label: "RTO Processing", value: null, effect: "Return shipment out for pickup. Timeline only." },
+  { id: 11, label: "RTO In Transit", value: null, effect: "Return shipment picked up and on its way back. Timeline only." },
+  { id: 12, label: "RTO Dispatched", value: null, effect: "Return shipment out for delivery to the seller (RTO OFD). Timeline only." },
+  { id: 21, label: "RTO Undelivered", value: null, effect: "Return delivery attempt failed. Timeline only." },
+  { id: 14, label: "RTO Delivered", value: "returned", effect: "Parcel is back with the seller. Order becomes Returned." },
+  { id: 15, label: "Not Found", value: null, effect: "Parcel reported lost. Timeline only; contact the courier or ship again." },
+  { id: 23, label: "Lost Accepted", value: null, effect: "Courier accepted the parcel as lost. Timeline only." },
 ];
 export const FINAL_SHIPMENT_STATUSES = ["delivered", "returned", "cancelled"];
 
 export const normaliseLabel = (v) => String(v ?? "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
-const ALIASES = { "order created": "created", booked: "created", canceled: "cancelled" };
+// Other common spellings (older Expressfly wording and other couriers) that mean the same as a label above.
+const ALIASES = {
+  "order created": "created",
+  booked: "created",
+  canceled: "cancelled",
+  "out for delivery": "dispatched",
+  ofd: "dispatched",
+  "rto ofd": "rto dispatched",
+  "rto initiated": "rto manifested",
+  undelivered: "ndr",
+  lost: "not found",
+  manifested: "not picked",
+};
 const BY_KEY = new Map(STATUS_LABELS.map((x) => [normaliseLabel(x.label), x]));
+const BY_ID = new Map(STATUS_LABELS.filter((x) => x.id != null).map((x) => [String(x.id), x]));
 
 
 export function mapStandardStatus(label) {
   const key = normaliseLabel(label);
-  const hit = BY_KEY.get(ALIASES[key] || key);
+  // A label (any case/punctuation) or the courier's numeric status id ("3", "14", ...).
+  const hit = BY_KEY.get(ALIASES[key] || key) || BY_ID.get(key);
   return hit ? { known: true, label: hit.label, value: hit.value } : { known: false, label: String(label ?? "").trim(), value: null };
 }
 
@@ -393,7 +420,7 @@ export const STANDARD_CONTRACT = {
       ["tracking_logs[].latitude / longitude", "optional", "Accepted and ignored."],
       ["_id, order_no", "optional", "Your own references. Accepted and ignored: Expressfly does not use them to find the shipment."],
     ],
-    statuses: STATUS_LABELS.map((x) => [x.label, x.effect]),
+    statuses: STATUS_LABELS.map((x) => [x.id != null ? `${x.label} (id ${x.id})` : x.label, x.effect]),
     responses: [
       { status: 200, when: "Update received", body: { success: true, message: "Tracking updated." } },
       {
@@ -410,7 +437,7 @@ export const STANDARD_CONTRACT = {
     ],
     notes: [
       "Retry only on timeouts and 5xx responses.",
-      "Matching ignores case and punctuation, so `In Transit`, `IN_TRANSIT` and `in-transit` are the same status.",
+      "Matching ignores case and punctuation, so `In Transit`, `IN_TRANSIT` and `in-transit` are the same status. The numeric status id (for example `3`) is accepted too.",
       "A label that is not in the table is still recorded on the shipment timeline, but it does not change the order status.",
       "Once a shipment is Delivered, RTO Delivered or Cancelled, later scans are recorded on the timeline but do not change its status.",
     ],

@@ -18,26 +18,26 @@ export const STANDARD_FIELDS = [
 // Tracking labels the courier sends in `last_tracking_status` / `status` (and their ids, `order_status_id`).
 // value = the shipment status Expressfly sets (the order status follows it); null = recorded on the timeline only.
 export const STATUS_LABELS = [
-  { id: null, label: "Pending", value: null, effect: "Ready to ship, not yet shipped. Timeline only." },
-  { id: 1, label: "Created", value: null, effect: "Order created with the courier. Timeline only." },
-  { id: 8, label: "Not Picked", value: null, effect: "Manifested, but the courier has not collected the parcel yet. Timeline only; the order status does not change." },
-  { id: 20, label: "Picked Up", value: "shipped", effect: "Collected from the warehouse. Order becomes Shipped." },
-  { id: 3, label: "In Transit", value: "shipped", effect: "Pickup done, moving between hubs. Order becomes Shipped." },
-  { id: 4, label: "Reached at Destination", value: "shipped", effect: "Reached the destination hub, still in transit. Order stays Shipped." },
-  { id: 22, label: "ODA", value: null, effect: "Delivery address is in an out-of-delivery area (ODA). Timeline only." },
-  { id: 5, label: "Dispatched", value: "out_for_delivery", effect: "Out for delivery (OFD). Order becomes Out for delivery." },
-  { id: 18, label: "NDR", value: null, effect: "Non-delivery report: a delivery attempt failed. Timeline only." },
-  { id: 6, label: "Delivered", value: "delivered", effect: "Delivered to the customer. Order becomes Delivered." },
-  { id: 7, label: "Cancelled", value: "cancelled", effect: "Shipment cancelled. Order status updated." },
-  { id: 19, label: "OTP Verified Cancellation", value: "cancelled", effect: "Cancelled after the customer verified with an OTP. Treated as Cancelled." },
-  { id: 9, label: "RTO Manifested", value: null, effect: "Return to origin created. Timeline only." },
-  { id: 10, label: "RTO Processing", value: null, effect: "Return shipment out for pickup. Timeline only." },
-  { id: 11, label: "RTO In Transit", value: null, effect: "Return shipment picked up and on its way back. Timeline only." },
-  { id: 12, label: "RTO Dispatched", value: null, effect: "Return shipment out for delivery to the seller (RTO OFD). Timeline only." },
-  { id: 21, label: "RTO Undelivered", value: null, effect: "Return delivery attempt failed. Timeline only." },
-  { id: 14, label: "RTO Delivered", value: "returned", effect: "Parcel is back with the seller. Order becomes Returned." },
-  { id: 15, label: "Not Found", value: null, effect: "Parcel reported lost. Timeline only; contact the courier or ship again." },
-  { id: 23, label: "Lost Accepted", value: null, effect: "Courier accepted the parcel as lost. Timeline only." },
+  { id: null, label: "Pending", desc: "Ready to ship (not yet shipped)", value: null, effect: "Ready to ship, not yet shipped. Timeline only." },
+  { id: 1, label: "Created", desc: "Order created", value: null, effect: "Order created with the courier. Timeline only." },
+  { id: 8, label: "Not Picked", desc: "Not picked up", value: null, effect: "Manifested, but the courier has not collected the parcel yet. Timeline only; the order status does not change." },
+  { id: 20, label: "Picked Up", desc: "Pickup done", value: "shipped", effect: "Collected from the warehouse. Order becomes Shipped." },
+  { id: 3, label: "In Transit", desc: "Pickup done, in transit", value: "shipped", effect: "Pickup done, moving between hubs. Order becomes Shipped." },
+  { id: 4, label: "Reached at Destination", desc: "Received at destination", value: "shipped", effect: "Reached the destination hub, still in transit. Order stays Shipped." },
+  { id: 22, label: "ODA", desc: "Out for delivery area", value: null, effect: "Delivery address is in an out-of-delivery area (ODA). Timeline only." },
+  { id: 5, label: "Dispatched", desc: "Out for delivery", value: "out_for_delivery", effect: "Out for delivery (OFD). Order becomes Out for delivery." },
+  { id: 18, label: "NDR", desc: "Non-delivery report", value: null, effect: "Non-delivery report: a delivery attempt failed. Timeline only." },
+  { id: 6, label: "Delivered", desc: "Delivery done", value: "delivered", effect: "Delivered to the customer. Order becomes Delivered." },
+  { id: 7, label: "Cancelled", desc: "Cancelled", value: "cancelled", effect: "Shipment cancelled. Order status updated." },
+  { id: 19, label: "OTP Verified Cancellation", desc: "OTP verified cancellation", value: "cancelled", effect: "Cancelled after the customer verified with an OTP. Treated as Cancelled." },
+  { id: 9, label: "RTO Manifested", desc: "Return order created", value: null, effect: "Return to origin created. Timeline only." },
+  { id: 10, label: "RTO Processing", desc: "Return order out for pickup", value: null, effect: "Return shipment out for pickup. Timeline only." },
+  { id: 11, label: "RTO In Transit", desc: "Return order pickup done", value: null, effect: "Return shipment picked up and on its way back. Timeline only." },
+  { id: 12, label: "RTO Dispatched", desc: "Return order out for delivery", value: null, effect: "Return shipment out for delivery to the seller (RTO OFD). Timeline only." },
+  { id: 21, label: "RTO Undelivered", desc: "Return undelivered", value: null, effect: "Return delivery attempt failed. Timeline only." },
+  { id: 14, label: "RTO Delivered", desc: "Return order delivery done", value: "returned", effect: "Parcel is back with the seller. Order becomes Returned." },
+  { id: 15, label: "Not Found", desc: "Lost and not responding", value: null, effect: "Parcel reported lost. Timeline only; contact the courier or ship again." },
+  { id: 23, label: "Lost Accepted", desc: "Lost accepted", value: null, effect: "Courier accepted the parcel as lost. Timeline only." },
 ];
 export const FINAL_SHIPMENT_STATUSES = ["delivered", "returned", "cancelled"];
 
@@ -63,7 +63,9 @@ export function mapStandardStatus(label) {
   const key = normaliseLabel(label);
   // A label (any case/punctuation) or the courier's numeric status id ("3", "14", ...).
   const hit = BY_KEY.get(ALIASES[key] || key) || BY_ID.get(key);
-  return hit ? { known: true, label: hit.label, value: hit.value } : { known: false, label: String(label ?? "").trim(), value: null };
+  return hit
+    ? { known: true, id: hit.id, label: hit.label, description: hit.desc || "", value: hit.value }
+    : { known: false, id: null, label: String(label ?? "").trim(), description: "", value: null };
 }
 
 

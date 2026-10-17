@@ -86,6 +86,20 @@ async function handleStandardWebhook(req, res, sp) {
 
   if (st.value && !FINAL_SHIPMENT_STATUSES.includes(shipment.status)) shipment.status = st.value;
 
+  // Track every courier status by its id and name, even the ones that do not change the order status.
+  const rawId = body.order_status_id ?? body.status_id;
+  const current = {
+    id: String(st.id ?? rawId ?? ""),
+    name: st.known ? st.label : label || scans[scans.length - 1].status,
+    description: st.description || "",
+    at: scans[scans.length - 1].at,
+  };
+  const prev = shipment.status_history[shipment.status_history.length - 1];
+  if (current.name && (!prev || prev.name !== current.name)) shipment.status_history.push(current);
+  if (current.name && (!shipment.courier_status || new Date(current.at) >= new Date(shipment.courier_status.at || 0))) {
+    shipment.courier_status = current;
+  }
+
   await shipment.save();
   await syncOrderFromShipments(shipment.order_id);
 

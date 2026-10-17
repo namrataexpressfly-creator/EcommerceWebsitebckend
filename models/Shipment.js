@@ -1,5 +1,16 @@
 import mongoose from "mongoose";
 
+// One courier tracking status (its numeric id, name and meaning), as the courier reports it.
+const courierStatusSchema = new mongoose.Schema(
+  {
+    id: { type: String, default: "" },
+    name: { type: String, required: true },
+    description: { type: String, default: "" },
+    at: { type: Date, default: Date.now },
+  },
+  { _id: false }
+);
+
 const eventSchema = new mongoose.Schema(
   {
     status: { type: String, required: true },
@@ -31,6 +42,9 @@ const shipmentSchema = new mongoose.Schema(
       enum: ["created", "shipped", "out_for_delivery", "delivered", "returned", "cancelled"],
       default: "created",
     },
+    // Latest courier status (id + name) and every status change in order, shown in tracking.
+    courier_status: { type: courierStatusSchema, default: null },
+    status_history: [courierStatusSchema],
     events: [eventSchema],
     raw_response: { type: mongoose.Schema.Types.Mixed, default: null },
     is_active: { type: Boolean, default: true },

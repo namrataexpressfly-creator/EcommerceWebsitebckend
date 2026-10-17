@@ -1,6 +1,7 @@
 import express from "express";
 import { StatusCodes } from "http-status-codes";
 import Order from "../models/Order.js";
+import Shipment from "../models/Shipment.js";
 import SupportTicket from "../models/SupportTicket.js";
 import { sendError } from "../utils/validation.js";
 
@@ -22,7 +23,12 @@ router.get("/:token", async (req, res) => {
       .sort({ created_at: -1 })
       .select("reason message messages status created_at updated_at");
 
-    res.json({ ...order.toObject(), tickets });
+    // What the customer may see of each shipment: courier, AWB, tracking link and the courier's status history.
+    const shipments = await Shipment.find({ order_id: order._id, is_active: true })
+      .sort({ created_at: 1 })
+      .select("courier_name awb_number tracking_url status courier_status status_history estimated_delivery created_at");
+
+    res.json({ ...order.toObject(), tickets, shipments });
   } catch (err) {
     sendError(res, err);
   }

@@ -91,6 +91,7 @@ async function handleStandardWebhook(req, res, sp) {
   const current = {
     id: String(st.id ?? rawId ?? ""),
     name: st.known ? st.label : label || scans[scans.length - 1].status,
+    label: st.known ? st.track : label || scans[scans.length - 1].status,
     description: st.description || "",
     at: scans[scans.length - 1].at,
   };

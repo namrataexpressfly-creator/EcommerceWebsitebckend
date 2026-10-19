@@ -5,6 +5,8 @@ const courierStatusSchema = new mongoose.Schema(
   {
     id: { type: String, default: "" },
     name: { type: String, required: true },
+    // The Expressfly tracking status this courier status is shown as (e.g. "Dispatched" -> "Out for delivery (OFD)").
+    label: { type: String, default: "" },
     description: { type: String, default: "" },
     at: { type: Date, default: Date.now },
   },

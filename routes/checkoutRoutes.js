@@ -86,7 +86,7 @@ router.post("/init", async (req, res) => {
         ? Boolean(publicPaymentSettings.own_razorpay_key_id && own_razorpay_key_secret_enc)
         : isRazorpayConfigured();
 
-    res.json({ seller_id: seller._id, items: priced, subtotal, item_discount, tax, razorpay_enabled: razorpayReady, payment_settings: publicPaymentSettings });
+    res.json({ seller_id: seller._id, items: priced, subtotal, item_discount, tax, shipping: SHIPPING_CHARGE, razorpay_enabled: razorpayReady, payment_settings: publicPaymentSettings });
   } catch (err) {
     sendError(res, err);
   }

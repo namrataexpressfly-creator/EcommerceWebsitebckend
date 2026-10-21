@@ -17,6 +17,8 @@ import { reserveStock, restoreStock } from "../utils/warehouseAllocator.js";
 import { sendOtpSms } from "../utils/sms.js";
 import { sendError, check, fail } from "../utils/validation.js";
 
+const SHIPPING_CHARGE = 49; // flat shipping charge per order, in rupees
+
 const router = express.Router();
 
 const OTP_TTL_MS = 5 * 60 * 1000; 
@@ -350,7 +352,8 @@ router.post("/order", async (req, res) => {
       }
     }
 
-    const shipping = subtotal > 999 ? 0 : 49;
+    // Flat shipping on every order (there is no free-shipping option).
+    const shipping = SHIPPING_CHARGE;
 
     const storefrontConfig = await StorefrontConfig.findOne({ seller_id: seller._id }).lean();
     const paymentSettings = storefrontConfig?.payment_settings || {

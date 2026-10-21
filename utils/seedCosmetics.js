@@ -196,7 +196,7 @@ async function seed() {
     { title: "Matte Lips, All Day", subtitle: "Velvet Matte Lipstick — buy 2 get 10% off", link_url: "" },
     { title: "Gift Sets for Every Occasion", subtitle: "Curated beauty boxes, ready to ship", link_url: "" },
     { title: "Clean Beauty, Real Results", subtitle: "Explore our Organic & Natural range", link_url: "" },
-    { title: "Free Shipping Over ₹999", subtitle: "On all orders across India", link_url: "" },
+    { title: "Flat ₹49 Shipping", subtitle: "On every order across India", link_url: "" },
   ];
 
   await Banner.insertMany(

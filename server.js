@@ -47,6 +47,7 @@ import shippingRoutes from "./routes/shippingRoutes.js";
 import pluginWebhookRoutes from "./routes/pluginWebhookRoutes.js";
 import adminPluginRoutes from "./routes/adminPluginRoutes.js";
 import developerAuthRoutes from "./routes/developerAuthRoutes.js";
+import absoluteMediaUrls from "./middleware/absoluteMediaUrls.js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -103,6 +104,9 @@ app.use(
     extended: true,
   })
 );
+
+// Image links go out as full URLs (https://<backend>/uploads/...) so they work on the live Vercel site.
+app.use(absoluteMediaUrls);
   app.use("/api", domainRoutes);
 app.use(
   express.static(

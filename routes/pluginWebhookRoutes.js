@@ -61,11 +61,13 @@ async function handleStandardWebhook(req, res, sp) {
     return {
       status: String(l.scan ?? "").trim() || label || "Update",
       note: [remark, location && `(${location})`].filter(Boolean).join(" "),
+      remark,
+      location,
       at: asDate(l.scan_date_time) || now,
       ref: String(l._id ?? "").trim(),
     };
   });
-  if (scans.length === 0) scans = [{ status: label, note: "", at: now, ref: "" }]; 
+  if (scans.length === 0) scans = [{ status: label, note: "", remark: "", location: "", at: now, ref: "" }]; 
   scans.sort((a, b) => a.at - b.at);
 
 

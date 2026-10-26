@@ -17,6 +17,9 @@ const eventSchema = new mongoose.Schema(
   {
     status: { type: String, required: true },
     note: { type: String, default: "" },
+    // The courier's own wording and place for this scan (note keeps both together, as before).
+    remark: { type: String, default: undefined },
+    location: { type: String, default: undefined },
     at: { type: Date, default: Date.now },
     ref: { type: String, default: "" }, 
   },

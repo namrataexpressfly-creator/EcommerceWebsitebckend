@@ -9,6 +9,7 @@ import Seller from "../models/Seller.js";
 import Customer from "../models/Customer.js";
 import Product from "../models/Product.js";
 import Warehouse from "../models/Warehouse.js";
+import Shipment from "../models/Shipment.js";
 import { moveOrderToWarehouse } from "../utils/warehouseAllocator.js";
 import { requireSellerAuth } from "../middleware/auth.js";
 
@@ -42,7 +43,30 @@ router.get("/orders", async (req, res) => {
     Order.find(filter).sort({ created_at: -1 }).skip(skip).limit(limit),
     Order.countDocuments(filter),
   ]);
-  res.json({ orders, total, page, limit });
+
+  // Courier shipments already booked for these orders, so the list can hide "Ship" once every pickup warehouse has shipped.
+  const shipments = await Shipment.find({ order_id: { $in: orders.map((o) => o._id) }, is_active: true })
+    .select("order_id warehouse_id awb_number courier_name status")
+    .lean();
+  const byOrder = new Map();
+  for (const s of shipments) {
+    const key = String(s.order_id);
+    if (!byOrder.has(key)) byOrder.set(key, []);
+    byOrder.get(key).push({ warehouse_id: s.warehouse_id, awb_number: s.awb_number, courier_name: s.courier_name, status: s.status });
+  }
+  const list = orders.map((o) => {
+    const obj = o.toObject();
+    const mine = byOrder.get(String(o._id)) || [];
+    const shippedFrom = new Set(mine.map((s) => String(s.warehouse_id)));
+    const pickups = (obj.pickup_warehouse_ids || []).map(String);
+    return {
+      ...obj,
+      shipments: mine,
+      has_unshipped_pickup: pickups.length ? pickups.some((w) => !shippedFrom.has(w)) : mine.length === 0,
+    };
+  });
+
+  res.json({ orders: list, total, page, limit });
 });
 
 
